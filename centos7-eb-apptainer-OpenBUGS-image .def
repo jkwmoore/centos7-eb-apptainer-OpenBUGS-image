@@ -1,4 +1,5 @@
 Bootstrap: docker
+# Swap the above to "Bootstrap: docker-daemon" to use local docker images rather than those on Dockerhub.
 From: jkwmoore/centos7-eb-apptainer-openbugs-image:latest
 
 %post
