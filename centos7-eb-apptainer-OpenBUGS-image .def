@@ -1,0 +1,81 @@
+Bootstrap: docker
+From: jkwmoore/centos7-eb-apptainer-openbugs-image:latest
+
+%post
+
+# cleanup, everything in /scratch is assumed to be temporary
+rm -rf /scratch/*
+
+cat > /debug <<'EOF'
+
+# Setup app environment variables.
+export PATH=/app/bin:$PATH
+export LD_LIBRARY_PATH=/app/lib:$LD_LIBRARY_PATH
+
+# Setup Lmod bits.
+export LMOD_ROOT="/usr/share/lmod"
+export LMOD_PKG="/usr/share/lmod/lmod"
+export LMOD_DIR="/usr/share/lmod/lmod/libexec/"
+export LMOD_CMD="/usr/share/lmod/lmod/libexec/lmod"
+export MODULESHOME="/usr/share/lmod/lmod"
+
+module()
+{
+  eval `$LMOD_CMD sh "$@"`
+}
+
+clearMT()
+{
+  eval $($LMOD_DIR/clearMT_cmd bash)
+}
+
+########################################################################
+#  ml is a shorthand tool for people who can't type moduel, err, module
+#  It is also a combination command:
+#     ml            -> module list
+#     ml gcc        -> module load gcc
+#     ml -gcc intel -> module unload gcc; module load intel
+#  It does much more do: "ml --help" for more information.
+ml()
+{
+  eval $($LMOD_DIR/ml_cmd "$@")
+}
+
+export -f module
+export -f clearMT
+export -f ml
+export MODULEPATH="/app/modules/all"
+
+EOF
+
+
+%runscript
+$@
+
+%environment
+
+    action="${0##*/}"
+    file="/debug"
+
+    case "${action}" in
+    shell)
+        if [ "${APPTAINER_SHELL:-}" = "/bin/bash" ]; then
+            set -- --noprofile --rcfile $file
+        elif test -z "${APPTAINER_SHELL:-}"; then
+            export APPTAINER_SHELL=/bin/bash
+            set -- --noprofile --rcfile $file
+        fi
+        ;;
+    exec)
+        export BASH_ENV="$file"
+        echo -e "** $*"
+        echo -e "@@ $@"	
+        set -- /bin/bash --noprofile --rcfile $file -c "$*"
+        ;;
+    run)
+        set -- /bin/bash --noprofile --rcfile $file
+    esac
+
+
+
+%labels
